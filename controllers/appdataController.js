@@ -13,18 +13,33 @@ const createAppData = async (req, res) => {
 
   try {
     const collection = getAppDataCollection(req);
-    const newData = {
-      ...req.body,
-      uuid: uuidv4(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    const body = req.body;
 
-    await collection.insertOne(newData);
+    let insertData;
+
+    if (Array.isArray(body)) {
+      // If body is an array of items
+      insertData = body.map(item => ({
+        ...item,
+        uuid: uuidv4(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+      await collection.insertMany(insertData);
+    } else {
+      // If body is a single object
+      insertData = {
+        ...body,
+        uuid: uuidv4(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await collection.insertOne(insertData);
+    }
 
     res.status(201).json({
       status: "success",
-      data: newData,
+      data: insertData,
     });
   } catch (error) {
     console.error("Error in createAppData:", error);
