@@ -13,18 +13,33 @@ const createAppData = async (req, res) => {
 
   try {
     const collection = getAppDataCollection(req);
-    const newData = {
-      ...req.body,
-      uuid: uuidv4(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    const body = req.body;
 
-    await collection.insertOne(newData);
+    let insertData;
+
+    if (Array.isArray(body)) {
+      // If body is an array of items
+      insertData = body.map(item => ({
+        ...item,
+        uuid: uuidv4(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+      await collection.insertMany(insertData);
+    } else {
+      // If body is a single object
+      insertData = {
+        ...body,
+        uuid: uuidv4(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await collection.insertOne(insertData);
+    }
 
     res.status(201).json({
       status: "success",
-      data: newData,
+      data: insertData,
     });
   } catch (error) {
     console.error("Error in createAppData:", error);
@@ -76,6 +91,44 @@ const getAppDataById = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in getAppDataById:", error);
+    res.status(500).json({
+      status: "failure",
+      message: error.message,
+    });
+  }
+};
+
+const getAppDataByFilter = async (req, res) => {
+  console.log('🔍 Aggregation pipeline from body:', JSON.stringify(req.body, null, 2));
+
+  try {
+    const collection = getAppDataCollection(req);
+
+    // Expect full aggregation pipeline from client
+    const pipeline = req.body;
+
+    if (!Array.isArray(pipeline)) {
+      return res.status(400).json({
+        status: "failure",
+        message: "Request body must be an array representing the aggregation pipeline",
+      });
+    }
+
+    const data = await collection.aggregate(pipeline).toArray();
+
+    if (!data.length) {
+      return res.status(404).json({
+        status: "failure",
+        message: "No matching data found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data,
+    });
+  } catch (error) {
+    console.error("Error in getAppDataByFilter:", error);
     res.status(500).json({
       status: "failure",
       message: error.message,
@@ -151,6 +204,7 @@ module.exports = {
   createAppData,
   getAllAppData,
   getAppDataById,
+  getAppDataByFilter,
   updateAppDataById,
   deleteAppDataById,
 };
